@@ -1,8 +1,8 @@
 #version 430 core
 
 
-float screenWidth = 800;
-float screenHeight = 800;
+float screenWidth = 1000.0;
+float screenHeight = 1000.0;
 
 
 
@@ -14,16 +14,21 @@ float screenHeight = 800;
 
 uniform vec3 camPos;
 
-#define SPHERE_NUM 3
+#define SPHERE_NUM 2
 #define LINE_NUM 3
+#define AMBIENCE 0.9
+#define PI 3.14159
+#define TWOPI 6.2832
+
+
 uniform vec4 SpherePositions[SPHERE_NUM];
 uniform vec3 SphereColors[SPHERE_NUM];
 uniform vec4 LinePositionsMapped[LINE_NUM];
 
-layout(std430, binding = 1) buffer MySSBO
-{
-	vec3 data[];
-} SSBOData;
+uniform sampler2D BackgroundTexture;
+uniform sampler2D EarthTexture;
+
+
 
 struct Ray
 {
@@ -31,21 +36,42 @@ struct Ray
 	vec3 dir; //ray direction
 };
 
-
-bool raySphereIntersection(Ray ray, vec3 sphereCentre, float radius)
+struct hitInfo
 {
-	/*
-	█▀▀ █░█ █▀▀ █▀▀ █▄▀   █ █▀▀   █ ▀█▀   █▀▀ █░█ █▀▀ █▄░█   █ █▄░█ ▀█▀ █▀▀ █▀█ █▀ █▀▀ █▀▀ ▀█▀ █▀
-	█▄▄ █▀█ ██▄ █▄▄ █░█   █ █▀░   █ ░█░   ██▄ ▀▄▀ ██▄ █░▀█   █ █░▀█ ░█░ ██▄ █▀▄ ▄█ ██▄ █▄▄ ░█░ ▄█
-	*/
-	
-	vec3 oc = ray.origin - sphereCentre;
-	float a = dot(ray.dir, ray.dir);
-	float b = 2.0 * dot(oc, ray.dir);
-	float c = dot(oc, oc) - radius*radius;
-	float discriminant = b*b - 4*a*c;
+	vec3 normal;
+	vec3 hitPoint;
+	float t;
+	bool noHit;
+};
 
-	return (discriminant >= 0.0);
+vec3 sampleSkybox(vec3 dir) {
+	float skyboxCeiling = 10.0; //dont ask me it was in the source code of NamePointer's Video
+	return min(vec3(skyboxCeiling), pow(texture(BackgroundTexture, 2 * vec2(0.5 + atan(dir.x, dir.z)/(2*PI), 0.5 + asin(-dir.y)/PI)).xyz, vec3(1.0/2.2)));
+	//i copied this from his video
+}
+
+
+hitInfo SphereRayIntersection(Ray ray, float sphereRadius, vec3 spherePosition) 
+{
+    float t = dot(spherePosition-ray.origin, ray.dir);
+    vec3 P = ray.origin + ray.dir*t;
+    float y = length(spherePosition-P);
+
+    if(y > sphereRadius)
+    {
+        return hitInfo(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0), -1.0, true);
+    }
+
+    float t1 = t - sqrt(sphereRadius*sphereRadius - y*y);
+    vec3 hitPoint = ray.origin + ray.dir*t1;
+    vec3 normal = normalize(hitPoint - spherePosition);
+
+	hitInfo h;
+	h.normal = normal;
+	h.hitPoint = hitPoint;
+	h.t = t1;
+	h.noHit = false;
+	return h;
 }
 
 
@@ -80,19 +106,53 @@ void main()
 	vec3 camDir = vec3(0.0, 0.0, 1.0);
 	float focalLength = 1.0f;
 
-	Ray camRay = Ray(camPos, vec3(screenUV, focalLength));
+	vec3 rayDir =  normalize(vec3(screenUV, focalLength));
 
-	vec3 Color =  vec3(0.08, 0.08, 0.08);
+	Ray camRay = Ray(camPos,rayDir );
+
+
+
+	
+	vec3 Color = sampleSkybox(camRay.dir);
+
+
+
+
+
+
+	float OldT = 10000000.0;
 
 	for(int i = 0; i<SPHERE_NUM; i++)
 	{
-		if(raySphereIntersection(camRay, SpherePositions[i].xyz, SpherePositions[i].w))
+		hitInfo h = SphereRayIntersection(camRay, SpherePositions[i].w, SpherePositions[i].xyz);
+		
+		if(!h.noHit && abs(h.t) < abs(OldT))
 		{
-			Color = SphereColors[i];
-		}
-		else
-		{
-			continue;
+			vec3 color;
+			if(i == 0)
+			{
+				vec3 d = normalize(SpherePositions[i].xyz - h.hitPoint);
+				color += (texture(EarthTexture, vec2(0.5 + atan(d.z, d.x)/TWOPI, 0.5 + asin(d.y)/TWOPI))).xyz;
+				color *= dot(normalize(h.hitPoint - vec3(500.0, 0.0, -20.0) ) , h.normal); //raytraced part
+			}
+			else
+			{
+				color = SphereColors[i] * dot(normalize(h.hitPoint - vec3(500.0, 0.0, -20.0) ) , h.normal); //raytraced part
+			}
+			
+			color += AMBIENCE * 1.0/(1+pow((length(color)-2.0),2)) * SphereColors[i]; //taking the inverse of the length of a color
+			//ik its cursed to take length of a color, but i am reducing ambient light the more the normal light is there
+
+			//plot y = 1/(1+(x+0.5)^2) in a graphing calculator, y is ambient adjustion (dw future me its a term i only made up),
+			//x is the brightness before adjustion
+
+			
+			
+				
+			
+
+			Color = color; //mind the capitalization
+			OldT = h.t;
 		}
 	}
 
@@ -100,7 +160,7 @@ void main()
 	{
 		if(isPointCloseToLine(LinePositionsMapped[i].xy, LinePositionsMapped[i].zw, screenUV))
 		{
-			Color = vec3(0.5, 0.25, 0.89);
+			Color = vec3(0.6, 0.8, 0.3);
 		}
 		else
 		{
@@ -108,6 +168,6 @@ void main()
 		}
 	}
 
-	
     gl_FragColor = vec4(Color, 1.0);
+
 }

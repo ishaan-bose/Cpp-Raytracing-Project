@@ -29,20 +29,37 @@ namespace IB
 
     class SimulationObject {
     private:
-        double mass;
+        float mass;
         Vector3 position; // Assuming position is a Vector3
         Vector3 velocity; // Assuming velocity is a Vector3
+        bool BigMass; //1 unit bigmass = 10^20 kg
 
     public:
+        // Setter for mass
+        void setMass(float newMass, bool isBigMass) {
+            mass = newMass;
+            BigMass = isBigMass;
+        }
+
+        // Setter for position
+        void setPosition(const Vector3& newPosition) {
+            position = newPosition;
+        }
+
+        // Setter for velocity
+        void setVelocity(const Vector3& newVelocity) {
+            velocity = newVelocity;
+        }
+
         // Default constructor
-        SimulationObject() : mass(1.0), position(Vector3()), velocity(Vector3()) {}
+        SimulationObject() : mass(1.0), position(Vector3()), velocity(Vector3()), BigMass(false) {}
 
         // Constructor with parameters
-        SimulationObject(double initialMass, const Vector3& initialPosition, const Vector3& initialVelocity)
-            : mass(initialMass), position(initialPosition), velocity(initialVelocity) {}
+        SimulationObject(float initialMass, bool initialBigMass, const Vector3& initialPosition, const Vector3& initialVelocity)
+            : mass(initialMass), position(initialPosition), velocity(initialVelocity), BigMass(initialBigMass) {}
 
         // Getter for mass
-        double getMass() const {
+        float getMass() const {
             return mass;
         }
 
@@ -57,15 +74,39 @@ namespace IB
         }
 
         // Function to update velocity based on force, deltaMass, and deltaTime
-        void applyForce(const Vector3& force, double deltaMass, double deltaTime) {
+        void applyForceWithMassChangeSmallMass(const Vector3& force, float deltaMass, float deltaTime) {
             Vector3 acceleration;
-            acceleration.x = force.x / (mass + deltaMass);
-            acceleration.y = force.y / (mass + deltaMass);
-            acceleration.z = force.z / (mass + deltaMass);
+            acceleration = force / (mass + deltaMass);
 
-            velocity.x += acceleration.x * deltaTime;
-            velocity.y += acceleration.y * deltaTime;
-            velocity.z += acceleration.z * deltaTime;
+            velocity = velocity + acceleration * deltaTime;
+
+            position = position + velocity * deltaTime;
         }
+
+        void applyForceSmallMass(const Vector3& force, float deltaTime) {
+            Vector3 acceleration;
+            acceleration = force / mass;
+
+            velocity = velocity + acceleration * deltaTime;
+
+            position = position + velocity * deltaTime;
+        }
+
+        //exact same as small mass function, only exists for understanding how much force and what mass it is
+        void applyForceBigMass(const Vector3& force, float deltaTime) {
+            Vector3 acceleration;
+            acceleration = force / mass;
+
+            velocity = velocity + acceleration * deltaTime;
+
+            position = position + velocity * deltaTime;
+        }
+    };
+
+    class MyCamera
+    {
+        Vector3 position;
+        Vector3 ForwardDirection;
+        float focal_length;
     };
 }

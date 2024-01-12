@@ -80,6 +80,7 @@
 #define RAYLIB_H
 
 #include <stdarg.h>     // Required for: va_list - Only used by TraceLogCallback
+#include <iostream>     //NOTE I INCLUDED THIS, NOT IN ORIGINAL RAYLIB CODE
 
 #define RAYLIB_VERSION_MAJOR 4
 #define RAYLIB_VERSION_MINOR 6
@@ -203,6 +204,72 @@ typedef struct Vector3 {
     float x;                // Vector x component
     float y;                // Vector y component
     float z;                // Vector z component
+
+    /*
+    * NOTE, THIS CODE IS NOT ORIGINALLY PART OF
+    * THE RAYLIB LIBRARY, THIS IS CUSTOM CODE
+    */
+
+    // Overloaded addition operator
+    Vector3 operator+(const Vector3& other) const {
+        return { x + other.x, y + other.y, z + other.z };
+    }
+
+    // Overloaded subtraction operator
+    Vector3 operator-(const Vector3& other) const {
+        return { x - other.x, y - other.y, z - other.z };
+    }
+
+    // Overloaded scalar multiplication operator
+    Vector3 operator*(float scalar) const {
+        return { x * scalar, y * scalar, z * scalar };
+    }
+
+    // Overloaded dot product operator
+    float operator*(const Vector3& other) const {
+        return x * other.x + y * other.y + z * other.z;
+    }
+
+    // Overloaded division operator
+    Vector3 operator/(float divisor) const {
+        if (divisor != 0.0f) {
+            return { x / divisor, y / divisor, z / divisor };
+        }
+        else {
+            // Handle division by zero gracefully
+            std::cerr << "Error: Division by zero!" << std::endl;
+            return *this;
+        }
+    }
+
+    // Overloaded greater than operator (compares lengths)
+    bool operator>(const Vector3& other) const {
+        return lengthSquared() > other.lengthSquared();
+    }
+
+    // Overloaded less than operator (compares lengths)
+    bool operator<(const Vector3& other) const {
+        return lengthSquared() < other.lengthSquared();
+    }
+
+    Vector3& operator=(const Vector3& other) {
+        if (this != &other) {
+            x = other.x;
+            y = other.y;
+            z = other.z;
+        }
+        return *this;
+    }
+
+private:
+    // Helper function to compute the squared length of the vector
+    float lengthSquared() const {
+        return x * x + y * y + z * z;
+    }
+
+    /*
+    * CUSTOM CODE END
+    */
 } Vector3;
 
 // Vector4, 4 components
